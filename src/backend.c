@@ -158,21 +158,20 @@ backend_emit_scroll(void *userdata, ScrollDelta sd)
 {
 	Backend *b = userdata;
 	if (b->uinput_ptr_fd < 0) return;
+
+	const struct {
+		uint16_t axis;
+		int val;
+	} items[] = {
+		{REL_WHEEL_HI_RES, sd.y_hires},
+		{REL_WHEEL, sd.y_discrete},
+		{REL_HWHEEL_HI_RES, sd.x_hires},
+		{REL_HWHEEL, sd.x_discrete},
+	};
 	bool sent = false;
-	if (sd.y_hires) {
-		write_event(b->uinput_ptr_fd, EV_REL, REL_WHEEL_HI_RES, sd.y_hires);
-		sent = true;
-	}
-	if (sd.y_discrete) {
-		write_event(b->uinput_ptr_fd, EV_REL, REL_WHEEL, sd.y_discrete);
-		sent = true;
-	}
-	if (sd.x_hires) {
-		write_event(b->uinput_ptr_fd, EV_REL, REL_HWHEEL_HI_RES, sd.x_hires);
-		sent = true;
-	}
-	if (sd.x_discrete) {
-		write_event(b->uinput_ptr_fd, EV_REL, REL_HWHEEL, sd.x_discrete);
+	for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++) {
+		if (!items[i].val) continue;
+		write_event(b->uinput_ptr_fd, EV_REL, items[i].axis, items[i].val);
 		sent = true;
 	}
 	if (sent) {
@@ -540,6 +539,27 @@ elapsed_usec(struct timespec *prev)
 	return (int)us;
 }
 
+static void
+read_keyboard_events(Backend *b, Engine *eng, size_t idx)
+{
+	struct input_event evs[32];
+	for (;;) {
+		ssize_t n = read(b->devs[idx].fd, evs, sizeof(evs));
+		if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
+		if (n <= 0) {
+			remove_device_at(b, eng, idx);
+			return;
+		}
+		size_t count = (size_t)n / sizeof(evs[0]);
+		for (size_t j = 0; j < count; j++) {
+			if (evs[j].type != EV_KEY || evs[j].code >= KEY_CNT) continue;
+			if (evs[j].value == 1) SET_BIT(evs[j].code, b->devs[idx].down);
+			else if (evs[j].value == 0) CLR_BIT(evs[j].code, b->devs[idx].down);
+			engine_process_key(eng, evs[j].code, evs[j].value);
+		}
+	}
+}
+
 int
 backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag)
 {
@@ -648,37 +668,8 @@ backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag)
 			short rev = pfds[dev_start + idx].revents;
 			if (rev & (POLLERR | POLLHUP | POLLNVAL)) {
 				remove_device_at(&b, eng, idx);
-				continue;
-			}
-			if (!(rev & POLLIN)) continue;
-
-			struct input_event evs[32];
-			bool unplugged = false;
-			for (;;) {
-				ssize_t n = read(b.devs[idx].fd, evs, sizeof(evs));
-				if (n < 0) {
-					if (errno == EAGAIN || errno == EWOULDBLOCK) break;
-					unplugged = true;
-					break;
-				}
-				if (n == 0) {
-					unplugged = true;
-					break;
-				}
-				size_t count = (size_t)n / sizeof(evs[0]);
-				for (size_t j = 0; j < count; j++) {
-					if (evs[j].type == EV_KEY && evs[j].code < KEY_CNT) {
-						if (evs[j].value == 1) {
-							SET_BIT(evs[j].code, b.devs[idx].down);
-						} else if (evs[j].value == 0) {
-							CLR_BIT(evs[j].code, b.devs[idx].down);
-						}
-						engine_process_key(eng, evs[j].code, evs[j].value);
-					}
-				}
-			}
-			if (unplugged) {
-				remove_device_at(&b, eng, idx);
+			} else if (rev & POLLIN) {
+				read_keyboard_events(&b, eng, idx);
 			}
 		}
 
