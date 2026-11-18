@@ -1,9 +1,13 @@
 # uptrkeys — Smooth Kernel-Level Mouse Keys for X11 & Wayland
 
-> **Note:** `uptrkeys` is a **vibecoded** (AI-generated) from-scratch C11 rewrite
-> inspired by [ptrkeys](https://github.com/torbiak/ptrkeys). It keeps
-> `ptrkeys`'s chorded mouse-key control scheme while moving from X11 grabs/`XTest`
-> to Linux `evdev` and `uinput` so it works identically on both X11 and Wayland.
+> **Disclaimer:** `uptrkeys` is a **vibecoded** (AI-generated) from-scratch C11
+> rewrite inspired by [ptrkeys](https://github.com/torbiak/ptrkeys).
+> - **Only tested in an X11 environment** so far — Wayland support is based on
+>   using kernel `evdev`/`uinput` and has not been live-tested in a Wayland
+>   compositor.
+> - **Use with care and read the source code yourself** before running it
+>   (especially since it reads `/dev/input/event*` with `EVIOCGRAB` and writes to
+>   `/dev/uinput`).
 
 `uptrkeys` turns your keyboard into a smooth, chorded pointer and scroll device
 on Linux using `evdev` and `uinput`, with physical `CapsLock` acting as the
@@ -61,8 +65,11 @@ Requirements:
 `uptrkeys` requires read access to `/dev/input/event*` (for physical keyboards)
 and write access to `/dev/uinput` (with the `uinput` kernel module loaded) to
 create its virtual keyboard and pointer devices. Configure these according to
-your system's `udev` / `input` group policy or run it under a dedicated service
-user with access to `/dev/input` and `/dev/uinput`.
+your system's `udev` / `input` group policy (for example, placing the binary on
+a mount without `nosuid` and setting `chgrp input` + `chmod 2755` when `input`
+already has `/dev/uinput` access, or running it under a dedicated service user
+with access to `/dev/input` and `/dev/uinput`). Note that rebuilding or
+reinstalling overwrites the binary and clears `setgid` bits.
 
 ## Configuration
 
