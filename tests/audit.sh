@@ -8,7 +8,7 @@ if [ ! -x "$BIN" ]; then
 	exit 1
 fi
 
-# 1. Verify ELF dynamic symbol allowlist:
+# 1. Verify ELF dynamic symbol allowlist (including _FORTIFY_SOURCE / musl variants):
 #    - Zero network (socket/connect/bind/listen/sendto/recvfrom/getaddrinfo)
 #    - Zero process spawn (fork/vfork/clone/exec*/system/popen)
 #    - Zero dynamic loading / env / arbitrary file streams (dlopen/getenv/fopen)
@@ -18,9 +18,17 @@ SYMS=$(nm -D -u "$BIN" | awk '{print $NF}' | sed 's/@.*//' | sort -u)
 ALLOWED="
 __cxa_finalize
 __errno_location
+__fprintf_chk
 __gmon_start__
 __libc_start_main
+__open64_2
+__open_2
+__poll_chk
+__printf_chk
+__read_chk
+__snprintf_chk
 __stack_chk_fail
+__vsnprintf_chk
 _ITM_deregisterTMCloneTable
 _ITM_registerTMCloneTable
 clock_gettime
@@ -76,8 +84,8 @@ if [ -n "$BAD_SYMS" ]; then
 fi
 
 # 2. Verify all absolute filesystem paths compiled into the binary are /dev/input* or /dev/uinput
-#    (plus the ELF interpreter /lib*/ld-linux*).
-BAD_PATHS=$(strings -n 4 "$BIN" | grep '^/' | grep -Ev '^(/dev/uinput$|/dev/input(/uinput|/%s)?$|/+lib(64)?/ld-linux)' || true)
+#    (plus the ELF dynamic linker /lib*/ld-linux* or /lib*/ld-musl*).
+BAD_PATHS=$(strings -n 4 "$BIN" | grep '^/' | grep -Ev '^(/dev/uinput$|/dev/input(/uinput|/%s)?$|/+lib(64)?/ld-(linux|musl))' || true)
 if [ -n "$BAD_PATHS" ]; then
 	echo "audit FAIL: unexpected path string(s): $BAD_PATHS" >&2
 	exit 1
@@ -88,7 +96,7 @@ if grep -qE '#include <(fcntl|unistd|dirent|stdlib|sys/)' src/engine.c; then
 	echo "audit FAIL: src/engine.c must stay pure (no OS/stdlib/fcntl/unistd headers)" >&2
 	exit 1
 fi
-if grep -rnE '\b(system|popen|fork|vfork|clone|exec[lv]|socket|connect|fopen|freopen|getenv|dlopen|ptrace)\s*\(' src/; then
+if grep -rnE '\b(system|popen|fork|vfork|clone|exec[lv]|socket|connect|fopen|freopen|fdopen|getenv|setenv|dlopen|ptrace)\s*\(' src/; then
 	echo "audit FAIL: forbidden function call found in src/" >&2
 	exit 1
 fi

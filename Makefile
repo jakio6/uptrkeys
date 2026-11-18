@@ -1,10 +1,11 @@
 CC ?= gcc
-CPPFLAGS ?= -I. -Isrc -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L
+CPPFLAGS ?=
 CFLAGS ?= -std=c11 -pedantic -Wall -Wextra -O2
 LDFLAGS ?= -s -lm
 PREFIX ?= /usr/local
 DESTDIR ?=
 
+SYS_CPPFLAGS := -I. -Isrc -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L
 VERSION := $(shell git rev-parse --short HEAD 2>/dev/null || echo "0.1.0")
 
 SRC := src/main.c src/engine.c src/backend.c
@@ -16,10 +17,10 @@ config.h: config.def.h
 	cp config.def.h $@
 
 uptrkeys: config.h src/uptrkeys.h $(SRC)
-	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) -DVERSION=\"$(VERSION)\" $(SRC) $(LDFLAGS)
+	$(CC) -o $@ $(SYS_CPPFLAGS) $(CPPFLAGS) $(CFLAGS) -DVERSION=\"$(VERSION)\" $(SRC) $(LDFLAGS)
 
 $(TEST_BIN): config.h src/uptrkeys.h src/engine.c tests/unit_test.c
-	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) src/engine.c tests/unit_test.c $(LDFLAGS)
+	$(CC) -o $@ $(SYS_CPPFLAGS) $(CPPFLAGS) $(CFLAGS) src/engine.c tests/unit_test.c $(LDFLAGS)
 
 audit: uptrkeys tests/audit.sh
 	sh ./tests/audit.sh ./uptrkeys
@@ -32,7 +33,7 @@ check: $(TEST_BIN) audit
 	fi
 
 sanitize: config.h src/uptrkeys.h src/engine.c tests/unit_test.c
-	$(CC) -o $(TEST_BIN)_san $(CPPFLAGS) -std=c11 -pedantic -Wall -Wextra -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer src/engine.c tests/unit_test.c -lm
+	$(CC) -o $(TEST_BIN)_san $(SYS_CPPFLAGS) $(CPPFLAGS) -std=c11 -pedantic -Wall -Wextra -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer src/engine.c tests/unit_test.c -lm
 	./$(TEST_BIN)_san
 	rm -f $(TEST_BIN)_san
 
