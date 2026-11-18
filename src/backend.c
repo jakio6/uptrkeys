@@ -690,7 +690,11 @@ backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag,
 		}
 
 		bool was_moving = engine_is_moving(eng);
-		struct timespec tick = {.tv_nsec = 1000000000L / (fps > 0 ? fps : 60)};
+		long tick_ns = 1000000000L / (fps > 0 ? fps : 60);
+		struct timespec tick = {
+			.tv_sec = tick_ns / 1000000000L,
+			.tv_nsec = tick_ns % 1000000000L,
+		};
 
 		// Stop signals are blocked except while waiting here (see main.c).
 		int rc = ppoll(pfds, nfds, was_moving ? &tick : NULL, wait_mask);

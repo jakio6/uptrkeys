@@ -64,6 +64,7 @@ read
 readdir
 sigaction
 sigaddset
+sigdelset
 sigemptyset
 sigprocmask
 snprintf

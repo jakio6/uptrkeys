@@ -30,16 +30,21 @@ static void
 install_signals(sigset_t *wait_mask)
 {
 	static const int sigs[] = {SIGINT, SIGTERM, SIGHUP};
-	struct sigaction sa = {0};
+	struct sigaction sa = {0}, old = {0};
 	sa.sa_handler = on_signal;
 	sigemptyset(&sa.sa_mask);
 	sigset_t block;
 	sigemptyset(&block);
 	for (size_t i = 0; i < sizeof(sigs) / sizeof(sigs[0]); i++) {
+		if (sigaction(sigs[i], NULL, &old) == -1) goto fail;
+		if (sigs[i] == SIGHUP && old.sa_handler == SIG_IGN) continue;
 		if (sigaction(sigs[i], &sa, NULL) == -1) goto fail;
 		sigaddset(&block, sigs[i]);
 	}
 	if (sigprocmask(SIG_BLOCK, &block, wait_mask) == -1) goto fail;
+	for (size_t i = 0; i < sizeof(sigs) / sizeof(sigs[0]); i++) {
+		sigdelset(wait_mask, sigs[i]);
+	}
 	return;
 fail:
 	fprintf(stderr, "uptrkeys: signal setup: %s\n", strerror(errno));
