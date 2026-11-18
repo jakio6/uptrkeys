@@ -23,17 +23,27 @@ on_signal(int sig)
 	stop_requested = 1;
 }
 
+// Installs stop handlers and blocks those signals; they are only delivered
+// inside backend_run's ppoll() (atomically unblocked via *wait_mask), so a
+// signal can never slip in between the stop-flag check and the wait.
 static void
-install_signals(void)
+install_signals(sigset_t *wait_mask)
 {
+	static const int sigs[] = {SIGINT, SIGTERM, SIGHUP};
 	struct sigaction sa = {0};
 	sa.sa_handler = on_signal;
 	sigemptyset(&sa.sa_mask);
-	if (sigaction(SIGINT, &sa, NULL) == -1 ||
-	    sigaction(SIGTERM, &sa, NULL) == -1) {
-		fprintf(stderr, "uptrkeys: sigaction: %s\n", strerror(errno));
-		exit(1);
+	sigset_t block;
+	sigemptyset(&block);
+	for (size_t i = 0; i < sizeof(sigs) / sizeof(sigs[0]); i++) {
+		if (sigaction(sigs[i], &sa, NULL) == -1) goto fail;
+		sigaddset(&block, sigs[i]);
 	}
+	if (sigprocmask(SIG_BLOCK, &block, wait_mask) == -1) goto fail;
+	return;
+fail:
+	fprintf(stderr, "uptrkeys: signal setup: %s\n", strerror(errno));
+	exit(1);
 }
 
 static void
@@ -77,12 +87,13 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	install_signals();
+	sigset_t wait_mask;
+	install_signals(&wait_mask);
 
 	Engine eng;
 	EngineOps empty_ops = {0};
 	engine_init(&eng, bindings, num_bindings, internal_mods,
 	            BASE_SPEED, BASE_SCROLL, empty_ops);
 
-	return backend_run(&eng, FPS, &stop_requested);
+	return backend_run(&eng, FPS, &stop_requested, &wait_mask);
 }

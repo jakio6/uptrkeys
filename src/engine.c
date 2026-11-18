@@ -26,7 +26,6 @@ static const struct {
 	{KEY_NUMLOCK,    MOD_NUMLOCK},
 	{KEY_LEFTMETA,   MOD_SUPER},
 	{KEY_RIGHTMETA,  MOD_SUPER},
-	{KEY_COMPOSE,    MOD_ALTGR},
 };
 
 static const struct {
@@ -39,7 +38,6 @@ static const struct {
 	{MOD_ALT,     "Alt"},
 	{MOD_NUMLOCK, "NumLock"},
 	{MOD_SUPER,   "Super"},
-	{MOD_ALTGR,   "AltGr"},
 };
 
 static const struct {

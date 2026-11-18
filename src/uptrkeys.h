@@ -27,7 +27,6 @@ enum ModMask {
 	MOD_ALT     = (1u << 3),
 	MOD_NUMLOCK = (1u << 4),
 	MOD_SUPER   = (1u << 5),
-	MOD_ALTGR   = (1u << 6),
 };
 
 enum BindOpts {
@@ -147,6 +146,7 @@ void cmd_quit(Engine *eng, const Arg *arg);
 
 // Kernel evdev/uinput backend (src/backend.c — zero heap, /dev/input + /dev/uinput only)
 extern int debug_level;
-int backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag);
+int backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag,
+                const sigset_t *wait_mask);
 
 #endif

@@ -36,7 +36,7 @@ The production code is intentionally tiny and split into 4 files in `src/` plus
 `config.def.h`:
 
 - `src/uptrkeys.h` — Shared structs and declarations.
-- `src/main.c` — CLI options, binding validation, `SIGINT`/`SIGTERM` flags.
+- `src/main.c` — CLI options, binding validation, `SIGINT`/`SIGTERM`/`SIGHUP` handling.
 - `src/engine.c` — Pure state machine and kinematics (**zero OS syscalls, zero heap**).
 - `src/backend.c` — Kernel I/O (**zero heap**, **zero network/exec/env/config I/O**,
   opens only `/dev/uinput` `O_WRONLY` and `/dev/input/event*` `O_RDONLY` with
@@ -54,6 +54,10 @@ make check     # runs unit tests + audit
 make sanitize  # runs unit tests under ASan + UBSan
 make PREFIX=~/.local install
 ```
+
+`make audit` is a quick sanity check (imported symbols, embedded paths,
+forbidden calls), not a proof. The real guarantee is reading the source, which
+is small enough to do in one sitting.
 
 Requirements:
 - Linux kernel headers (`linux/input.h`, `linux/uinput.h`)

@@ -1,7 +1,7 @@
-CC ?= gcc
 CPPFLAGS ?=
 CFLAGS ?= -std=c11 -pedantic -Wall -Wextra -O2
-LDFLAGS ?= -s -lm
+LDFLAGS ?= -s
+LDLIBS ?= -lm
 PREFIX ?= /usr/local
 DESTDIR ?=
 
@@ -18,10 +18,10 @@ config.h:
 	cp config.def.h $@
 
 uptrkeys: config.h src/uptrkeys.h $(SRC)
-	$(CC) -o $@ $(SYS_CPPFLAGS) $(CPPFLAGS) $(CFLAGS) -DVERSION=\"$(VERSION)\" $(SRC) $(LDFLAGS)
+	$(CC) -o $@ $(SYS_CPPFLAGS) $(CPPFLAGS) $(CFLAGS) -DVERSION=\"$(VERSION)\" $(SRC) $(LDFLAGS) $(LDLIBS)
 
 $(TEST_BIN): config.h src/uptrkeys.h src/engine.c tests/unit_test.c
-	$(CC) -o $@ $(SYS_CPPFLAGS) $(CPPFLAGS) $(CFLAGS) src/engine.c tests/unit_test.c $(LDFLAGS)
+	$(CC) -o $@ $(SYS_CPPFLAGS) $(CPPFLAGS) $(CFLAGS) src/engine.c tests/unit_test.c $(LDFLAGS) $(LDLIBS)
 
 audit: uptrkeys tests/audit.sh
 	sh ./tests/audit.sh ./uptrkeys
@@ -34,7 +34,7 @@ check: $(TEST_BIN) audit
 	fi
 
 sanitize: config.h src/uptrkeys.h src/engine.c tests/unit_test.c
-	$(CC) -o $(TEST_BIN)_san $(SYS_CPPFLAGS) $(CPPFLAGS) -std=c11 -pedantic -Wall -Wextra -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer src/engine.c tests/unit_test.c -lm
+	$(CC) -o $(TEST_BIN)_san $(SYS_CPPFLAGS) $(CPPFLAGS) -std=c11 -pedantic -Wall -Wextra -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer src/engine.c tests/unit_test.c $(LDLIBS)
 	./$(TEST_BIN)_san
 	rm -f $(TEST_BIN)_san
 
@@ -43,9 +43,7 @@ clean:
 
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin $(DESTDIR)$(PREFIX)/share/man/man1
-	cp uptrkeys $(DESTDIR)$(PREFIX)/bin/uptrkeys
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/uptrkeys
-	cp uptrkeys.1 $(DESTDIR)$(PREFIX)/share/man/man1/uptrkeys.1
-	chmod 644 $(DESTDIR)$(PREFIX)/share/man/man1/uptrkeys.1
+	install -m 755 uptrkeys $(DESTDIR)$(PREFIX)/bin/uptrkeys
+	install -m 644 uptrkeys.1 $(DESTDIR)$(PREFIX)/share/man/man1/uptrkeys.1
 
 .PHONY: all audit check clean install sanitize

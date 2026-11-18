@@ -24,6 +24,7 @@ __libc_start_main
 __open64_2
 __open_2
 __poll_chk
+__ppoll_chk
 __printf_chk
 __read_chk
 __snprintf_chk
@@ -54,12 +55,15 @@ nanosleep
 open
 opendir
 poll
+ppoll
 printf
 puts
 read
 readdir
 sigaction
+sigaddset
 sigemptyset
+sigprocmask
 snprintf
 stderr
 stdout
@@ -98,7 +102,7 @@ if grep -qE '#include <(fcntl|unistd|dirent|stdlib|sys/)' src/engine.c; then
 	echo "audit FAIL: src/engine.c must stay pure (no OS/stdlib/fcntl/unistd headers)" >&2
 	exit 1
 fi
-if grep -rnE '\b(system|popen|fork|vfork|clone|exec[lv]|socket|connect|fopen|freopen|fdopen|getenv|setenv|dlopen|ptrace)\s*\(' src/; then
+if grep -rnE '\b(system|popen|fork|vfork|clone|exec[lv][pe]*|socket|connect|fopen|freopen|fdopen|getenv|setenv|dlopen|ptrace)\s*\(' src/; then
 	echo "audit FAIL: forbidden function call found in src/" >&2
 	exit 1
 fi

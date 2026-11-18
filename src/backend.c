@@ -1,3 +1,4 @@
+#define _GNU_SOURCE /* ppoll() */
 #include "uptrkeys.h"
 
 #include <dirent.h>
@@ -46,6 +47,7 @@ typedef struct {
 	ino_t ino;
 	char path[DEV_PATH_MAX];
 	unsigned long down[NBITS(KEY_CNT)];
+	bool dropped; // SYN_DROPPED seen: discard until SYN_REPORT, then resync
 } KbdDevice;
 
 typedef struct {
@@ -126,8 +128,9 @@ backend_emit_key(void *userdata, unsigned int keycode, int value)
 {
 	Backend *b = userdata;
 	if (b->uinput_kbd_fd < 0) return;
+	const char *kname = keycode_name(keycode);
 	logf_lvl(b, (value == 2) ? 2 : 1, "out kbd: %s (%u) val=%d",
-	         keycode_name(keycode) ? keycode_name(keycode) : "unknown", keycode, value);
+	         kname ? kname : "unknown", keycode, value);
 	write_event(b->uinput_kbd_fd, EV_KEY, (uint16_t)keycode, value);
 	write_event(b->uinput_kbd_fd, EV_SYN, SYN_REPORT, 0);
 }
@@ -411,6 +414,7 @@ try_open_keyboard(Backend *b, const char *path)
 	d->dev = fst.st_dev;
 	d->ino = fst.st_ino;
 	memset(d->down, 0, sizeof(d->down));
+	d->dropped = false;
 	snprintf(d->path, sizeof(d->path), "%s", path);
 	logf_lvl(b, 1, "grabbed keyboard %s (\"%s\")", d->path, name);
 }
@@ -539,12 +543,31 @@ elapsed_usec(struct timespec *prev)
 	return (int)us;
 }
 
+// After the kernel dropped events (buffer overflow), diff our per-device key
+// state against the real state and feed the engine the missing transitions,
+// so no key stays stuck down or up.
+static void
+resync_keys(Backend *b, Engine *eng, KbdDevice *d)
+{
+	unsigned long now[NBITS(KEY_CNT)] = {0};
+	if (ioctl(d->fd, EVIOCGKEY(sizeof(now)), now) < 0) return;
+	logf_lvl(b, 1, "events dropped on %s: resyncing key state", d->path);
+	for (unsigned int k = 0; k < KEY_CNT; k++) {
+		bool is_down = TEST_BIT(k, now);
+		if (is_down == (bool)TEST_BIT(k, d->down)) continue;
+		if (is_down) SET_BIT(k, d->down);
+		else CLR_BIT(k, d->down);
+		engine_process_key(eng, k, is_down ? 1 : 0);
+	}
+}
+
 static void
 read_keyboard_events(Backend *b, Engine *eng, size_t idx)
 {
+	KbdDevice *d = &b->devs[idx];
 	struct input_event evs[32];
 	for (;;) {
-		ssize_t n = read(b->devs[idx].fd, evs, sizeof(evs));
+		ssize_t n = read(d->fd, evs, sizeof(evs));
 		if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
 		if (n <= 0) {
 			remove_device_at(b, eng, idx);
@@ -552,16 +575,29 @@ read_keyboard_events(Backend *b, Engine *eng, size_t idx)
 		}
 		size_t count = (size_t)n / sizeof(evs[0]);
 		for (size_t j = 0; j < count; j++) {
-			if (evs[j].type != EV_KEY || evs[j].code >= KEY_CNT) continue;
-			if (evs[j].value == 1) SET_BIT(evs[j].code, b->devs[idx].down);
-			else if (evs[j].value == 0) CLR_BIT(evs[j].code, b->devs[idx].down);
-			engine_process_key(eng, evs[j].code, evs[j].value);
+			const struct input_event *ev = &evs[j];
+			if (ev->type == EV_SYN && ev->code == SYN_DROPPED) {
+				d->dropped = true;
+				continue;
+			}
+			if (d->dropped) {
+				if (ev->type == EV_SYN && ev->code == SYN_REPORT) {
+					d->dropped = false;
+					resync_keys(b, eng, d);
+				}
+				continue;
+			}
+			if (ev->type != EV_KEY || ev->code >= KEY_CNT) continue;
+			if (ev->value == 1) SET_BIT(ev->code, d->down);
+			else if (ev->value == 0) CLR_BIT(ev->code, d->down);
+			engine_process_key(eng, ev->code, ev->value);
 		}
 	}
 }
 
 int
-backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag)
+backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag,
+            const sigset_t *wait_mask)
 {
 	Backend b = {
 		.uinput_kbd_fd = -1,
@@ -652,13 +688,13 @@ backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag)
 		}
 
 		bool was_moving = engine_is_moving(eng);
-		int timeout_ms = was_moving ? (1000 / (fps > 0 ? fps : 60)) : -1;
-		if (timeout_ms == 0) timeout_ms = 1;
+		struct timespec tick = {.tv_nsec = 1000000000L / (fps > 0 ? fps : 60)};
 
-		int rc = poll(pfds, nfds, timeout_ms);
+		// Stop signals are blocked except while waiting here (see main.c).
+		int rc = ppoll(pfds, nfds, was_moving ? &tick : NULL, wait_mask);
 		if (rc < 0) {
 			if (errno == EINTR) continue;
-			fprintf(stderr, "uptrkeys: poll: %s\n", strerror(errno));
+			fprintf(stderr, "uptrkeys: ppoll: %s\n", strerror(errno));
 			break;
 		}
 
