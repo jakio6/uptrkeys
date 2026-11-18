@@ -12,7 +12,7 @@
 #define VERSION "dev"
 #endif
 
-#define USAGE "usage: uptrkeys [-d|--debug] [-dd|--trace] [-h|--help] [-v|--version]\n"
+#define USAGE "usage: uptrkeys [-i|--info] [-d|--debug] [-dd|--trace] [-h|--help] [-v|--version]\n"
 
 static volatile sig_atomic_t stop_requested = 0;
 
@@ -50,11 +50,13 @@ static void
 parse_args(int argc, char *argv[])
 {
 	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--debug") == 0 ||
-		    strcmp(argv[i], "--verbose") == 0) {
-			debug_level = (debug_level < 1) ? 1 : 2;
+		if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--info") == 0) {
+			if (debug_level < LOG_INFO) debug_level = LOG_INFO;
+		} else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--debug") == 0 ||
+		           strcmp(argv[i], "--verbose") == 0) {
+			debug_level = (debug_level < LOG_DEBUG) ? LOG_DEBUG : LOG_TRACE;
 		} else if (strcmp(argv[i], "-dd") == 0 || strcmp(argv[i], "--trace") == 0) {
-			debug_level = 2;
+			debug_level = LOG_TRACE;
 		} else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
 			printf(USAGE);
 			exit(0);
@@ -73,10 +75,11 @@ main(int argc, char *argv[])
 {
 	parse_args(argc, argv);
 
-	// Debug logs contain keystrokes; never print them with borrowed privileges.
-	if (debug_level > 0 && getegid() != getgid()) {
-		fprintf(stderr, "uptrkeys: -d/-dd refused when running setgid "
-		                "(debug logs contain keystrokes)\n");
+	// Debug/trace logs contain keystrokes; only allow -i/--info when setuid/setgid.
+	if (debug_level >= LOG_DEBUG &&
+	    (getegid() != getgid() || geteuid() != getuid())) {
+		fprintf(stderr, "uptrkeys: -d/-dd refused when running setuid/setgid "
+		                "(use -i/--info for non-sensitive logs)\n");
 		return 1;
 	}
 

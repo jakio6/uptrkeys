@@ -129,7 +129,7 @@ backend_emit_key(void *userdata, unsigned int keycode, int value)
 	Backend *b = userdata;
 	if (b->uinput_kbd_fd < 0) return;
 	const char *kname = keycode_name(keycode);
-	logf_lvl(b, (value == 2) ? 2 : 1, "out kbd: %s (%u) val=%d",
+	logf_lvl(b, (value == 2) ? LOG_TRACE : LOG_DEBUG, "out kbd: %s (%u) val=%d",
 	         kname ? kname : "unknown", keycode, value);
 	write_event(b->uinput_kbd_fd, EV_KEY, (uint16_t)keycode, value);
 	write_event(b->uinput_kbd_fd, EV_SYN, SYN_REPORT, 0);
@@ -140,7 +140,7 @@ backend_emit_button(void *userdata, unsigned int button, int value)
 {
 	Backend *b = userdata;
 	if (b->uinput_ptr_fd < 0) return;
-	logf_lvl(b, 1, "out btn: %s (0x%x) val=%d", button_name(button), button, value);
+	logf_lvl(b, LOG_DEBUG, "out btn: %s (0x%x) val=%d", button_name(button), button, value);
 	write_event(b->uinput_ptr_fd, EV_KEY, (uint16_t)button, value);
 	write_event(b->uinput_ptr_fd, EV_SYN, SYN_REPORT, 0);
 }
@@ -150,7 +150,7 @@ backend_emit_motion(void *userdata, int dx, int dy)
 {
 	Backend *b = userdata;
 	if (b->uinput_ptr_fd < 0 || (!dx && !dy)) return;
-	logf_lvl(b, 2, "out motion: dx=%d dy=%d", dx, dy);
+	logf_lvl(b, LOG_TRACE, "out motion: dx=%d dy=%d", dx, dy);
 	if (dx) write_event(b->uinput_ptr_fd, EV_REL, REL_X, dx);
 	if (dy) write_event(b->uinput_ptr_fd, EV_REL, REL_Y, dy);
 	write_event(b->uinput_ptr_fd, EV_SYN, SYN_REPORT, 0);
@@ -178,7 +178,7 @@ backend_emit_scroll(void *userdata, ScrollDelta sd)
 		sent = true;
 	}
 	if (sent) {
-		logf_lvl(b, 2, "out scroll: disc=(%d,%d) hires=(%d,%d)",
+		logf_lvl(b, LOG_TRACE, "out scroll: disc=(%d,%d) hires=(%d,%d)",
 		         sd.x_discrete, sd.y_discrete, sd.x_hires, sd.y_hires);
 		write_event(b->uinput_ptr_fd, EV_SYN, SYN_REPORT, 0);
 	}
@@ -307,13 +307,13 @@ is_keyboard_device(const Backend *b, int fd, const char *path, char *name_out, s
 		snprintf(name_out, name_len, "%s", name);
 	}
 	if (strncmp(name, "uptrkeys virtual ", 17) == 0) {
-		logf_lvl(b, 2, "skip %s (\"%s\"): own virtual device", path, name);
+		logf_lvl(b, LOG_INFO, "skip %s (\"%s\"): own virtual device", path, name);
 		return false;
 	}
 
 	unsigned long ev_bits[NBITS(EV_CNT)] = {0};
 	if (ioctl(fd, EVIOCGBIT(0, sizeof(ev_bits)), ev_bits) < 0 || !TEST_BIT(EV_KEY, ev_bits)) {
-		logf_lvl(b, 2, "skip %s (\"%s\"): no EV_KEY", path, name);
+		logf_lvl(b, LOG_INFO, "skip %s (\"%s\"): no EV_KEY", path, name);
 		return false;
 	}
 
@@ -326,7 +326,7 @@ is_keyboard_device(const Backend *b, int fd, const char *path, char *name_out, s
 	};
 	for (size_t i = 0; i < sizeof(required_keys) / sizeof(required_keys[0]); i++) {
 		if (!TEST_BIT(required_keys[i], key_bits)) {
-			logf_lvl(b, 2, "skip %s (\"%s\"): missing alpha keys", path, name);
+			logf_lvl(b, LOG_INFO, "skip %s (\"%s\"): missing alpha keys", path, name);
 			return false;
 		}
 	}
@@ -370,7 +370,7 @@ try_open_keyboard(Backend *b, const char *path)
 	if (lstat(path, &lst) == -1 || !S_ISCHR(lst.st_mode)) return;
 	if (device_already_open(b, lst.st_dev, lst.st_ino)) return;
 	if (b->num_devs >= MAX_KEYBOARDS) {
-		logf_lvl(b, 1, "skip %s: max keyboard limit (%d) reached", path, MAX_KEYBOARDS);
+		logf_lvl(b, LOG_INFO, "skip %s: max keyboard limit (%d) reached", path, MAX_KEYBOARDS);
 		return;
 	}
 
@@ -382,9 +382,9 @@ try_open_keyboard(Backend *b, const char *path)
 				snprintf(b->first_denied_path, sizeof(b->first_denied_path), "%s", path);
 			}
 			b->perm_denied++;
-			logf_lvl(b, 1, "permission denied opening %s: %s", path, strerror(errno));
+			logf_lvl(b, LOG_INFO, "permission denied opening %s: %s", path, strerror(errno));
 		} else {
-			logf_lvl(b, 2, "skip %s: %s", path, strerror(errno));
+			logf_lvl(b, LOG_INFO, "skip %s: %s", path, strerror(errno));
 		}
 		return;
 	}
@@ -404,7 +404,7 @@ try_open_keyboard(Backend *b, const char *path)
 
 	wait_keys_released(fd, GRAB_WAIT_RELEASE_MS);
 	if (ioctl(fd, EVIOCGRAB, 1) == -1) {
-		logf_lvl(b, 1, "grab failed on %s (\"%s\"): %s", path, name, strerror(errno));
+		logf_lvl(b, LOG_INFO, "grab failed on %s (\"%s\"): %s", path, name, strerror(errno));
 		close(fd);
 		return;
 	}
@@ -416,14 +416,14 @@ try_open_keyboard(Backend *b, const char *path)
 	memset(d->down, 0, sizeof(d->down));
 	d->dropped = false;
 	snprintf(d->path, sizeof(d->path), "%s", path);
-	logf_lvl(b, 1, "grabbed keyboard %s (\"%s\")", d->path, name);
+	logf_lvl(b, LOG_INFO, "grabbed keyboard %s (\"%s\")", d->path, name);
 }
 
 static void
 remove_device_at(Backend *b, Engine *eng, size_t idx)
 {
 	if (idx >= b->num_devs) return;
-	logf_lvl(b, 1, "unplugged keyboard %s", b->devs[idx].path);
+	logf_lvl(b, LOG_INFO, "unplugged keyboard %s", b->devs[idx].path);
 	for (unsigned int k = 0; k < KEY_CNT; k++) {
 		if (TEST_BIT(k, b->devs[idx].down)) {
 			CLR_BIT(k, b->devs[idx].down);
@@ -551,7 +551,7 @@ resync_keys(Backend *b, Engine *eng, KbdDevice *d)
 {
 	unsigned long now[NBITS(KEY_CNT)] = {0};
 	if (ioctl(d->fd, EVIOCGKEY(sizeof(now)), now) < 0) return;
-	logf_lvl(b, 1, "events dropped on %s: resyncing key state", d->path);
+	logf_lvl(b, LOG_INFO, "events dropped on %s: resyncing key state", d->path);
 	for (unsigned int k = 0; k < KEY_CNT; k++) {
 		bool is_down = TEST_BIT(k, now);
 		if (is_down == (bool)TEST_BIT(k, d->down)) continue;
@@ -608,7 +608,7 @@ backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag,
 	eng->debug_level = debug_level;
 
 	const char *pname = keycode_name(eng->prefix_key);
-	logf_lvl(&b, 1, "starting (fps=%d prefix=%s(%u) base_speed=%.0f base_scroll=%.1f bindings=%zu debug=%d)",
+	logf_lvl(&b, LOG_INFO, "starting (fps=%d prefix=%s(%u) base_speed=%.0f base_scroll=%.1f bindings=%zu log_level=%d)",
 	         fps, pname ? pname : "unknown", eng->prefix_key,
 	         eng->base_speed, eng->base_scroll, eng->num_bindings, debug_level);
 
@@ -628,7 +628,7 @@ backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag,
 		backend_cleanup(&b, eng);
 		return 1;
 	}
-	logf_lvl(&b, 1, "virtual devices ready: \"%s\", \"%s\"", VDEV_KBD_NAME, VDEV_PTR_NAME);
+	logf_lvl(&b, LOG_INFO, "virtual devices ready: \"%s\", \"%s\"", VDEV_KBD_NAME, VDEV_PTR_NAME);
 
 	b.inotify_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
 	if (b.inotify_fd < 0 ||
@@ -724,8 +724,8 @@ backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag,
 		}
 	}
 
-	logf_lvl(&b, 1, "shutting down (quitting=%d stop_signal=%d)",
-	         eng->quitting ? 1 : 0, (stop_flag && *stop_flag) ? 1 : 0);
+	logf_lvl(&b, LOG_INFO, "shutting down (stop_signal=%d)",
+	         (stop_flag && *stop_flag) ? 1 : 0);
 	backend_cleanup(&b, eng);
 	return 0;
 }

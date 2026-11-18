@@ -19,6 +19,13 @@ enum Direction {
 	DIR_RIGHT = (1u << 3),
 };
 
+enum LogLevel {
+	LOG_QUIET = 0,
+	LOG_INFO  = 1, // Non-sensitive device & lifecycle events (safe for setgid)
+	LOG_DEBUG = 2, // Key routing, mode transitions, button & key emissions
+	LOG_TRACE = 3, // Autorepeats, swallowed keys, motion & scroll ticks
+};
+
 typedef struct {
 	double base_speed;
 	unsigned int dir;

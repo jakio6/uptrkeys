@@ -186,7 +186,7 @@ test_normal_mode_and_wm_keys_untouched(void)
 	Engine eng;
 	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
-	eng.debug_level = 2;
+	eng.debug_level = LOG_TRACE;
 
 	// Normal typing forwards press, repeat, and release
 	engine_process_key(&eng, KEY_A, 1);
@@ -219,7 +219,7 @@ test_mod_plus_mouse_both_orders(void)
 	Engine eng;
 	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
-	eng.debug_level = 2;
+	eng.debug_level = LOG_TRACE;
 
 	// Order A: Hold Super FIRST, then hold CapsLock -> Super+LeftDrag works like physical mouse!
 	engine_process_key(&eng, KEY_LEFTMETA, 1);
@@ -278,7 +278,7 @@ test_passthrough_vs_bound_mods(void)
 	Engine eng;
 	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
-	eng.debug_level = 2;
+	eng.debug_level = LOG_TRACE;
 
 	engine_process_key(&eng, KEY_CAPSLOCK, 1);
 	assert(eng.active);
@@ -336,7 +336,7 @@ test_scroll_and_multipliers_under_capslock(void)
 	Engine eng;
 	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
-	eng.debug_level = 2;
+	eng.debug_level = LOG_TRACE;
 
 	// Hold CapsLock, hold Tab for scroll mode, scroll diagonally S + A
 	engine_process_key(&eng, KEY_CAPSLOCK, 1);
@@ -393,7 +393,7 @@ test_autorepeat_and_midkey_activation(void)
 	Engine eng;
 	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
-	eng.debug_level = 2;
+	eng.debug_level = LOG_TRACE;
 
 	// Normal key pressed BEFORE CapsLock is released cleanly upon CapsLock press
 	engine_process_key(&eng, KEY_D, 1);
@@ -429,6 +429,23 @@ test_autorepeat_and_midkey_activation(void)
 	engine_process_key(&eng, KEY_CAPSLOCK, 0);
 	assert(!eng.active);
 	assert(log.msg_count > 10);
+
+	// LOG_INFO (used by -i/--info and allowed when setgid) emits zero engine/keystroke logs
+	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
+	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
+	eng.debug_level = LOG_INFO;
+	engine_process_key(&eng, KEY_A, 1);
+	engine_process_key(&eng, KEY_A, 2);
+	engine_process_key(&eng, KEY_A, 0);
+	engine_process_key(&eng, KEY_CAPSLOCK, 1);
+	engine_process_key(&eng, KEY_LEFTCTRL, 1);
+	engine_process_key(&eng, KEY_TAB, 1);
+	engine_process_key(&eng, KEY_W, 1);
+	engine_process_key(&eng, KEY_SPACE, 1);
+	engine_tick(&eng, 10000);
+	engine_process_key(&eng, KEY_X, 1);
+	engine_process_key(&eng, KEY_CAPSLOCK, 0);
+	assert(log.msg_count == 0);
 }
 
 int

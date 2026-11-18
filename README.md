@@ -79,7 +79,7 @@ For reference only: the author's quick test was a setgid-`input` binary
 `input` can write `/dev/uinput`). This is **risky** — anyone allowed to execute
 that binary gets keyboard access through it — and is not a recommendation.
 When running setgid, `-d`/`-dd` are refused because debug logs contain
-keystrokes.
+keystrokes; use `-i`/`--info` for non-sensitive startup/device logs.
 
 ## Caveats
 
@@ -116,8 +116,9 @@ allowing normal `Mod + Click` / `Mod + Drag` / `Mod + Scroll`.
 
 ## Debugging
 
-- `uptrkeys -d` (or `--debug`, `--verbose`): logs keyboard grabs/unplugs, key events, `CapsLock` prefix transitions, scroll/speed changes, and button/key emissions with timestamps on `stderr`.
-- `uptrkeys -dd` (or `--trace`): also logs skipped `/dev/input/event*` devices, autorepeat suppression, and every motion/scroll tick.
+- `uptrkeys -i` (or `--info`): logs non-sensitive startup, virtual-device, skipped/grabbed/unplugged `/dev/input/event*`, dropped-event resync, and shutdown messages on `stderr` (never logs keystrokes or pointer events; allowed when setuid/setgid).
+- `uptrkeys -d` (or `--debug`, `--verbose`): also logs key routing, `CapsLock` prefix transitions, scroll/speed changes, and button/key emissions (refused when setuid/setgid).
+- `uptrkeys -dd` (or `--trace`): also logs autorepeat suppression and every motion/scroll tick (refused when setuid/setgid).
 
 ## Acknowledgements
 

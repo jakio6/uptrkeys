@@ -3,6 +3,7 @@
 uptrkeys \- kernel-level mouse keys for X11 and Wayland
 .SH SYNOPSIS
 .B uptrkeys
+.RB [ \-i | \-\-info ]
 .RB [ \-d | \-\-debug ]
 .RB [ \-dd | \-\-trace ]
 .RB [ \-h | \-\-help ]
@@ -24,17 +25,22 @@ while still passing through unbound modifiers (such as Super or right-side
 modifiers) so modifier-plus-mouse combinations work like a physical mouse.
 .SH OPTIONS
 .TP
+.B \-i, \-\-info
+Log non-sensitive startup, device scan/grab/unplug, resync, and shutdown events to stderr. Never logs keystrokes or pointer events; allowed when setuid/setgid.
+.TP
 .B \-d, \-\-debug, \-\-verbose
-Log device grabs/unplugs, key routing, pointer mode transitions, and button emissions to stderr.
+Also log key routing, pointer mode transitions, and button/key emissions to stderr.
 .TP
 .B \-dd, \-\-trace
-Also log skipped /dev/input devices, key repeats, and every motion/scroll tick.
+Also log key repeats and every motion/scroll tick.
 .P
 Debug output contains keystrokes, so
 .B \-d
 and
 .B \-dd
-are refused when the program runs setgid.
+are refused when running setuid/setgid (use
+.B \-i
+instead).
 .TP
 .B \-h, \-\-help
 Print usage and exit.

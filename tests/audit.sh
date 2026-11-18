@@ -41,7 +41,9 @@ fputc
 fstat
 fwrite
 getegid
+geteuid
 getgid
+getuid
 inotify_add_watch
 inotify_init1
 ioctl

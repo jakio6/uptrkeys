@@ -293,7 +293,7 @@ static void
 activate(Engine *eng)
 {
 	eng->active = true;
-	eng_log(eng, 1, "state: active=1 (pointer mode enabled)");
+	eng_log(eng, LOG_DEBUG, "state: active=1 (pointer mode enabled)");
 	for (unsigned int k = 0; k < KEY_CNT; k++) {
 		if (!eng->virt_down[k]) continue;
 		// Keep unbound modifiers down so pre-held Super/Shift+Click works.
@@ -301,7 +301,7 @@ activate(Engine *eng)
 		emit_virt_key(eng, k, 0);
 		eng->suppress_until_release[k] = 1;
 		const char *kname = keycode_name(k);
-		eng_log(eng, 1, "release & suppress pre-held key %s (%u)",
+		eng_log(eng, LOG_DEBUG, "release & suppress pre-held key %s (%u)",
 		        kname ? kname : "unknown", k);
 	}
 }
@@ -318,7 +318,7 @@ deactivate(Engine *eng)
 	}
 	eng->active = false;
 	reset_tracks(eng);
-	eng_log(eng, 1, "state: active=0 (pointer mode disabled, released_btns=%d)", released);
+	eng_log(eng, LOG_DEBUG, "state: active=0 (pointer mode disabled, released_btns=%d)", released);
 }
 
 void
@@ -330,14 +330,14 @@ engine_process_key(Engine *eng, unsigned int code, int value)
 
 	if (value == 2) {
 		bool forward = !eng->active && eng->virt_down[code];
-		eng_log(eng, 2, "key %s (%u) val=2 -> %s", kname, code,
+		eng_log(eng, LOG_TRACE, "key %s (%u) val=2 -> %s", kname, code,
 		        forward ? "forward" : "suppressed");
 		if (forward) emit_virt_key(eng, code, 2);
 		return;
 	}
 	if (value != 0 && value != 1) return;
 
-	eng_log(eng, 1, "in key %s (%u) val=%d active=%d",
+	eng_log(eng, LOG_DEBUG, "in key %s (%u) val=%d active=%d",
 	        kname, code, value, eng->active ? 1 : 0);
 
 	if (value == 0) {
@@ -366,7 +366,7 @@ engine_process_key(Engine *eng, unsigned int code, int value)
 		return;
 	}
 	if (eng->suppress_until_release[code]) {
-		eng_log(eng, 2, "key %s (%u) suppressed until release", kname, code);
+		eng_log(eng, LOG_TRACE, "key %s (%u) suppressed until release", kname, code);
 		return;
 	}
 
@@ -376,14 +376,14 @@ engine_process_key(Engine *eng, unsigned int code, int value)
 	} else if (is_mod_key(code)) {
 		emit_virt_key(eng, code, 1);
 	} else {
-		eng_log(eng, 2, "swallowed unbound key %s (%u) while active", kname, code);
+		eng_log(eng, LOG_TRACE, "swallowed unbound key %s (%u) while active", kname, code);
 	}
 }
 
 static void
 log_track(const Engine *eng, const char *kind, const MotionTrack *m, int scroll_mode)
 {
-	if (eng->debug_level < 1) return;
+	if (eng->debug_level < LOG_DEBUG) return;
 	char dbuf[8];
 	snprintf(dbuf, sizeof(dbuf), "%s%s%s%s",
 	         (m->dir & DIR_UP) ? "U" : "",
@@ -392,9 +392,9 @@ log_track(const Engine *eng, const char *kind, const MotionTrack *m, int scroll_
 	         (m->dir & DIR_RIGHT) ? "R" : "");
 	if (!dbuf[0]) snprintf(dbuf, sizeof(dbuf), "none");
 	if (scroll_mode >= 0) {
-		eng_log(eng, 1, "%s: dir=%s mul=%.3g scroll_mode=%d", kind, dbuf, m->mul, scroll_mode);
+		eng_log(eng, LOG_DEBUG, "%s: dir=%s mul=%.3g scroll_mode=%d", kind, dbuf, m->mul, scroll_mode);
 	} else {
-		eng_log(eng, 1, "%s: dir=%s mul=%.3g", kind, dbuf, m->mul);
+		eng_log(eng, LOG_DEBUG, "%s: dir=%s mul=%.3g", kind, dbuf, m->mul);
 	}
 }
 
@@ -447,7 +447,7 @@ cmd_move_to_scroll(Engine *eng, const Arg *arg)
 	eng->ptr.y_rem = 0.0;
 	eng->ptr.x_cont = false;
 	eng->ptr.y_cont = false;
-	eng_log(eng, 1, "state: move_is_scroll=%d (base_speed=%.1f)",
+	eng_log(eng, LOG_DEBUG, "state: move_is_scroll=%d (base_speed=%.1f)",
 	        enable ? 1 : 0, eng->ptr.base_speed);
 }
 
@@ -457,7 +457,7 @@ cmd_multiply_speed(Engine *eng, const Arg *arg)
 	if (!arg || arg->f <= 0.0) return;
 	eng->ptr.mul *= arg->f;
 	eng->scroll.mul *= arg->f;
-	eng_log(eng, 1, "speed: *%.3g -> mul=%.4g", arg->f, eng->ptr.mul);
+	eng_log(eng, LOG_DEBUG, "speed: *%.3g -> mul=%.4g", arg->f, eng->ptr.mul);
 }
 
 void
@@ -466,7 +466,7 @@ cmd_divide_speed(Engine *eng, const Arg *arg)
 	if (!arg || arg->f <= 0.0) return;
 	eng->ptr.mul /= arg->f;
 	eng->scroll.mul /= arg->f;
-	eng_log(eng, 1, "speed: /%.3g -> mul=%.4g", arg->f, eng->ptr.mul);
+	eng_log(eng, LOG_DEBUG, "speed: /%.3g -> mul=%.4g", arg->f, eng->ptr.mul);
 }
 
 void
@@ -487,4 +487,5 @@ cmd_quit(Engine *eng, const Arg *arg)
 	(void)arg;
 	deactivate(eng);
 	eng->quitting = true;
+	eng_log(eng, LOG_DEBUG, "state: quitting=1");
 }
