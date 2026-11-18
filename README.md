@@ -1,8 +1,13 @@
 # uptrkeys — Smooth Kernel-Level Mouse Keys for X11 & Wayland
 
-`uptrkeys` is a minimal C11 daemon that turns your keyboard into a smooth,
-chorded pointer and scroll device on Linux using `evdev` and `uinput`, with
-physical `CapsLock` acting as the hold-to-activate prefix layer key.
+> **Note:** `uptrkeys` is a **vibecoded** (AI-generated) from-scratch C11 rewrite
+> inspired by [ptrkeys](https://github.com/torbiak/ptrkeys). It keeps
+> `ptrkeys`'s chorded mouse-key control scheme while moving from X11 grabs/`XTest`
+> to Linux `evdev` and `uinput` so it works identically on both X11 and Wayland.
+
+`uptrkeys` turns your keyboard into a smooth, chorded pointer and scroll device
+on Linux using `evdev` and `uinput`, with physical `CapsLock` acting as the
+hold-to-activate prefix layer key.
 
 Because it operates at the kernel input layer rather than X11 grabs:
 
@@ -43,7 +48,7 @@ make
 make audit     # verifies ELF dynamic symbol allowlist & path allowlist
 make check     # runs unit tests + audit
 make sanitize  # runs unit tests under ASan + UBSan
-sudo make install
+make PREFIX=~/.local install
 ```
 
 Requirements:
@@ -53,20 +58,11 @@ Requirements:
 
 ## Permissions
 
-`uptrkeys` needs read access to `/dev/input/event*` and write access to
-`/dev/uinput`. Typically you add your user to the `input` group and create a
-udev rule for `/dev/uinput`:
-
-```sh
-sudo usermod -aG input "$USER"
-echo 'KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"' | \
-  sudo tee /etc/udev/rules.d/99-uinput.rules
-sudo udevadm control --reload-rules && sudo udevadm trigger /dev/uinput
-```
-
-Log out and back in for group changes to apply. Alternatively, run `uptrkeys`
-under a dedicated `uptrkeys` systemd service (`SupplementaryGroups=input`) so
-your login user needs no `input`/`uinput` privileges.
+`uptrkeys` requires read access to `/dev/input/event*` (for physical keyboards)
+and write access to `/dev/uinput` (with the `uinput` kernel module loaded) to
+create its virtual keyboard and pointer devices. Configure these according to
+your system's `udev` / `input` group policy or run it under a dedicated service
+user with access to `/dev/input` and `/dev/uinput`.
 
 ## Configuration
 
@@ -98,4 +94,8 @@ straight through to the virtual keyboard, allowing normal `Mod + Click` /
 ## Debugging
 
 - `uptrkeys -d` (or `--debug`, `--verbose`): logs keyboard grabs/unplugs, key events, `CapsLock` prefix transitions, speed/scroll toggles, and button/key emissions with timestamps on `stderr`.
-- `uptrkeys -dd` (or `--trace`): also logs skipped `/dev/input/event*` devices, autorepeat suppression, and every 120Hz motion/scroll tick.
+- `uptrkeys -dd` (or `--trace`): also logs skipped `/dev/input/event*` devices, autorepeat suppression, and every motion/scroll tick.
+
+## Acknowledgements
+
+Inspired by [ptrkeys](https://github.com/torbiak/ptrkeys) by Jordan Torbiak.
