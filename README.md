@@ -64,25 +64,18 @@ Requirements:
 
 `uptrkeys` requires read access to `/dev/input/event*` (for physical keyboards)
 and write access to `/dev/uinput` (with the `uinput` kernel module loaded) to
-create its virtual keyboard and pointer devices. Configure these according to
-your system's `udev` / `input` group policy.
+create its virtual keyboard and pointer devices.
 
-One option is a setgid binary on a mount without `nosuid`, when the `input`
-group already has `/dev/uinput` access:
+How you grant that access is **your choice and your trust decision**. Any
+program with this access can read every keystroke, so pick a setup you
+understand and are comfortable with for your system.
 
-```sh
-chown "$USER":input uptrkeys
-chmod 2710 uptrkeys   # owner + input group may run it; others may not
-```
-
-> [!WARNING]
-> Do **not** use `chmod 2755`: that lets every local user run a program that
-> can read all keyboards with `input` group rights. Note that Linux ignores the
-> setgid bit unless group-execute is also set, so `2700` will not work.
-> When running setgid, `-d`/`-dd` are refused because debug logs contain
-> keystrokes.
-
-Rebuilding or reinstalling overwrites the binary and clears the setgid bit.
+For reference only: the author's quick test was a setgid-`input` binary
+(`chgrp input` + `chmod g+s`, on a mount without `nosuid`, on a system where
+`input` can write `/dev/uinput`). This is **risky** — anyone allowed to execute
+that binary gets keyboard access through it — and is not a recommendation.
+When running setgid, `-d`/`-dd` are refused because debug logs contain
+keystrokes.
 
 ## Caveats
 
