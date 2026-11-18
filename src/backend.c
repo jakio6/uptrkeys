@@ -60,6 +60,8 @@ typedef struct {
 	size_t perm_denied;
 	int first_denied_err;
 	char first_denied_path[DEV_PATH_MAX];
+	size_t grab_busy;
+	char first_busy_path[DEV_PATH_MAX];
 	int scan_dir_err;
 } Backend;
 
@@ -363,6 +365,26 @@ device_already_open(const Backend *b, dev_t dev, ino_t ino)
 	return false;
 }
 
+static int
+open_evdev(const char *path, struct stat *fst_out)
+{
+	struct stat lst;
+	if (lstat(path, &lst) == -1 || !S_ISCHR(lst.st_mode)) return -1;
+
+	int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW);
+	if (fd < 0) return -1;
+
+	struct stat fst;
+	if (fstat(fd, &fst) == -1 || !S_ISCHR(fst.st_mode) ||
+	    fst.st_dev != lst.st_dev || fst.st_ino != lst.st_ino) {
+		close(fd);
+		errno = ENODEV;
+		return -1;
+	}
+	if (fst_out) *fst_out = fst;
+	return fd;
+}
+
 static void
 try_open_keyboard(Backend *b, const char *path)
 {
@@ -374,7 +396,8 @@ try_open_keyboard(Backend *b, const char *path)
 		return;
 	}
 
-	int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW);
+	struct stat fst;
+	int fd = open_evdev(path, &fst);
 	if (fd < 0) {
 		if (errno == EACCES || errno == EPERM) {
 			if (b->perm_denied == 0) {
@@ -389,13 +412,6 @@ try_open_keyboard(Backend *b, const char *path)
 		return;
 	}
 
-	struct stat fst;
-	if (fstat(fd, &fst) == -1 || !S_ISCHR(fst.st_mode) ||
-	    fst.st_dev != lst.st_dev || fst.st_ino != lst.st_ino) {
-		close(fd);
-		return;
-	}
-
 	char name[256] = {0};
 	if (!is_keyboard_device(b, fd, path, name, sizeof(name))) {
 		close(fd);
@@ -404,6 +420,12 @@ try_open_keyboard(Backend *b, const char *path)
 
 	wait_keys_released(fd, GRAB_WAIT_RELEASE_MS);
 	if (ioctl(fd, EVIOCGRAB, 1) == -1) {
+		if (errno == EBUSY) {
+			if (b->grab_busy == 0) {
+				snprintf(b->first_busy_path, sizeof(b->first_busy_path), "%s", path);
+			}
+			b->grab_busy++;
+		}
 		logf_lvl(b, LOG_INFO, "grab failed on %s (\"%s\"): %s", path, name, strerror(errno));
 		close(fd);
 		return;
@@ -447,6 +469,34 @@ remove_device_by_path(Backend *b, Engine *eng, const char *path)
 			return;
 		}
 	}
+}
+
+static bool
+uptrkeys_already_running(void)
+{
+	DIR *dir = opendir("/dev/input");
+	if (!dir) return false;
+
+	bool found = false;
+	struct dirent *ent;
+	while ((ent = readdir(dir)) != NULL) {
+		if (strncmp(ent->d_name, "event", 5) != 0) continue;
+		char path[DEV_PATH_MAX];
+		snprintf(path, sizeof(path), "/dev/input/%s", ent->d_name);
+		int fd = open_evdev(path, NULL);
+		if (fd < 0) continue;
+
+		char name[256] = {0};
+		if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) >= 0 &&
+		    strncmp(name, "uptrkeys virtual ", 17) == 0) {
+			fprintf(stderr, "uptrkeys: error: already running (%s: \"%s\")\n", path, name);
+			found = true;
+		}
+		close(fd);
+		if (found) break;
+	}
+	closedir(dir);
+	return found;
 }
 
 static void
@@ -612,6 +662,8 @@ backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag,
 	         fps, pname ? pname : "unknown", eng->prefix_key,
 	         eng->base_speed, eng->base_scroll, eng->num_bindings, debug_level);
 
+	if (uptrkeys_already_running()) return 1;
+
 	b.uinput_kbd_fd = create_virtual_keyboard();
 	if (b.uinput_kbd_fd < 0) {
 		fprintf(stderr, "uptrkeys: open /dev/uinput for keyboard failed: %s\n"
@@ -665,6 +717,14 @@ backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag,
 			        "Ensure the user/service running uptrkeys is in the 'input' group\n"
 			        "(log out and back in after usermod -aG input, or set SupplementaryGroups=input).\n",
 			        b.perm_denied, b.first_denied_path, strerror(b.first_denied_err));
+			backend_cleanup(&b, eng);
+			return 1;
+		}
+		if (b.grab_busy > 0) {
+			fprintf(stderr,
+			        "uptrkeys: error: %zu keyboard(s) already grabbed by another process "
+			        "(e.g. %s: Device or resource busy)\n",
+			        b.grab_busy, b.first_busy_path);
 			backend_cleanup(&b, eng);
 			return 1;
 		}
