@@ -1,0 +1,44 @@
+.TH UPTRKEYS 1
+.SH NAME
+uptrkeys \- kernel-level mouse keys for X11 and Wayland
+.SH SYNOPSIS
+.B uptrkeys
+.RB [ \-d | \-\-debug ]
+.RB [ \-dd | \-\-trace ]
+.RB [ \-h | \-\-help ]
+.RB [ \-v | \-\-version ]
+.SH DESCRIPTION
+.B uptrkeys
+reads physical keyboard devices via Linux
+.B evdev
+and synthesizes virtual keyboard and pointer events via
+.B uinput
+across both X11 and Wayland.
+.P
+When the prefix key (physical
+.BR CapsLock
+by default) is not held, keys are forwarded transparently. Holding the prefix
+key activates pointer mode, mapping keys to smooth pointer motion,
+high-resolution and discrete scrolling, speed multipliers, and mouse buttons
+while still passing through non-internal modifiers (such as Super or right-side
+modifiers) so modifier-plus-mouse combinations work like a physical mouse.
+.SH OPTIONS
+.TP
+.B \-d, \-\-debug, \-\-verbose
+Log device grabs/unplugs, key routing, pointer mode transitions, and button emissions to stderr.
+.TP
+.B \-dd, \-\-trace
+Also log skipped /dev/input devices, key repeats, and every 60Hz motion/scroll tick.
+.TP
+.B \-h, \-\-help
+Print usage and exit.
+.TP
+.B \-v, \-\-version
+Print version and exit.
+.SH CONFIGURATION
+Edit
+.I config.h
+(copied from
+.I config.def.h
+on build) and recompile with
+.BR make .
