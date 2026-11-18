@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #ifndef VERSION
 #define VERSION "dev"
@@ -61,6 +62,13 @@ int
 main(int argc, char *argv[])
 {
 	parse_args(argc, argv);
+
+	// Debug logs contain keystrokes; never print them with borrowed privileges.
+	if (debug_level > 0 && getegid() != getgid()) {
+		fprintf(stderr, "uptrkeys: -d/-dd refused when running setgid "
+		                "(debug logs contain keystrokes)\n");
+		return 1;
+	}
 
 	size_t num_bindings = sizeof(bindings) / sizeof(bindings[0]);
 	char errbuf[256] = {0};

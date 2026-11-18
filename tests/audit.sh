@@ -39,6 +39,8 @@ fprintf
 fputc
 fstat
 fwrite
+getegid
+getgid
 inotify_add_watch
 inotify_init1
 ioctl

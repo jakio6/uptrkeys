@@ -13,7 +13,8 @@ TEST_BIN := unit_test
 
 all: uptrkeys
 
-config.h: config.def.h
+# No prerequisite: never overwrite a user's existing config.h.
+config.h:
 	cp config.def.h $@
 
 uptrkeys: config.h src/uptrkeys.h $(SRC)

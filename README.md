@@ -65,11 +65,34 @@ Requirements:
 `uptrkeys` requires read access to `/dev/input/event*` (for physical keyboards)
 and write access to `/dev/uinput` (with the `uinput` kernel module loaded) to
 create its virtual keyboard and pointer devices. Configure these according to
-your system's `udev` / `input` group policy (for example, placing the binary on
-a mount without `nosuid` and setting `chgrp input` + `chmod 2755` when `input`
-already has `/dev/uinput` access, or running it under a dedicated service user
-with access to `/dev/input` and `/dev/uinput`). Note that rebuilding or
-reinstalling overwrites the binary and clears `setgid` bits.
+your system's `udev` / `input` group policy.
+
+One option is a setgid binary on a mount without `nosuid`, when the `input`
+group already has `/dev/uinput` access:
+
+```sh
+chown "$USER":input uptrkeys
+chmod 2710 uptrkeys   # owner + input group may run it; others may not
+```
+
+> [!WARNING]
+> Do **not** use `chmod 2755`: that lets every local user run a program that
+> can read all keyboards with `input` group rights. Note that Linux ignores the
+> setgid bit unless group-execute is also set, so `2700` will not work.
+> When running setgid, `-d`/`-dd` are refused because debug logs contain
+> keystrokes.
+
+Rebuilding or reinstalling overwrites the binary and clears the setgid bit.
+
+## Caveats
+
+- **CapsLock is never sent to applications.** If CapsLock is already on when
+  `uptrkeys` starts, you cannot turn it off until `uptrkeys` exits.
+- **Keyboards are grabbed exclusively** (`EVIOCGRAB`, which also blocks
+  SysRq). If the process hangs, recover with a mouse, ssh, or another
+  terminal (`kill` it; the kernel releases the grab when it exits).
+- **`x` in pointer mode quits `uptrkeys`.** Remove or rebind it in `config.h`
+  if that is too easy to hit.
 
 ## Configuration
 

@@ -29,6 +29,12 @@ Log device grabs/unplugs, key routing, pointer mode transitions, and button emis
 .TP
 .B \-dd, \-\-trace
 Also log skipped /dev/input devices, key repeats, and every motion/scroll tick.
+.P
+Debug output contains keystrokes, so
+.B \-d
+and
+.B \-dd
+are refused when the program runs setgid.
 .TP
 .B \-h, \-\-help
 Print usage and exit.
