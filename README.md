@@ -93,34 +93,30 @@ keystrokes.
 
 ## Configuration
 
-Customize bindings, speeds (`BASE_SPEED`, `BASE_SCROLL`), frame rate (`FPS`),
-and `internal_mods` in `config.h` (copied from `config.def.h` on first build),
-then rebuild with `make`.
+Customize `PREFIX_KEY` (default `KEY_CAPSLOCK`), pointer-mode bindings, speeds
+(`BASE_SPEED`, `BASE_SCROLL`), and frame rate (`FPS`) in `config.h` (copied
+from `config.def.h` on first build), then rebuild with `make`.
 
-### `internal_mods` vs `Mod + Mouse`
+### Modifiers (`Mod + Mouse`)
 
-`internal_mods` (default `MOD_SHIFT | MOD_CTRL | MOD_ALT`) prevents pointer
-control modifiers that are bound in `bindings[]` (`KEY_LEFTCTRL`,
-`KEY_LEFTALT`), or used as a global scroll-mode chord (`Shift+CapsLock`), from
-leaking to applications. Any modifier not listed in `internal_mods` (such as
-`MOD_SUPER`) and any modifier key not bound in `bindings[]` (such as
-`KEY_LEFTSHIFT`, `KEY_RIGHTSHIFT`, `KEY_RIGHTCTRL`, `KEY_RIGHTALT`) passes
-straight through to the virtual keyboard, allowing normal `Mod + Click` /
-`Mod + Drag` / `Mod + Scroll`.
+Any modifier key bound in `bindings[]` (`KEY_LEFTCTRL`, `KEY_LEFTALT`) is
+consumed for pointer speed control while pointer mode is active. Unbound
+modifiers (`KEY_LEFTSHIFT`, `KEY_RIGHTSHIFT`, `KEY_LEFTMETA`, `KEY_RIGHTMETA`,
+`KEY_RIGHTCTRL`, `KEY_RIGHTALT`) pass straight through to the virtual keyboard,
+allowing normal `Mod + Click` / `Mod + Drag` / `Mod + Scroll`.
 
 ## Default Bindings
 
-- **Enable/Disable**: Hold physical `CapsLock` (release to exit), `Shift+CapsLock`
-  (sticky scroll mode), `q` (deactivate), `x` (quit)
+- **Enable/Disable**: Hold physical `CapsLock` (release to exit), `x` (quit)
 - **Move**: `w`, `a`, `s`, `d`
-- **Scroll**: hold `Tab` or toggle `f`
+- **Scroll**: hold `Tab`
 - **Multipliers**: `LeftAlt` (`/8`), `LeftCtrl` (`*32`), `j` (`/8`), `k` (`/2`),
   `l` (`*4`), `;` (`*8`)
 - **Click**: `Space` (left), `e`/`n` (right), `r`/`m` (middle)
 
 ## Debugging
 
-- `uptrkeys -d` (or `--debug`, `--verbose`): logs keyboard grabs/unplugs, key events, `CapsLock` prefix transitions, speed/scroll toggles, and button/key emissions with timestamps on `stderr`.
+- `uptrkeys -d` (or `--debug`, `--verbose`): logs keyboard grabs/unplugs, key events, `CapsLock` prefix transitions, scroll/speed changes, and button/key emissions with timestamps on `stderr`.
 - `uptrkeys -dd` (or `--trace`): also logs skipped `/dev/input/event*` devices, autorepeat suppression, and every motion/scroll tick.
 
 ## Acknowledgements

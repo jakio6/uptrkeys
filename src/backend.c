@@ -607,8 +607,10 @@ backend_run(Engine *eng, int fps, const volatile sig_atomic_t *stop_flag,
 	clock_gettime(CLOCK_MONOTONIC, &b.start_ts);
 	eng->debug_level = debug_level;
 
-	logf_lvl(&b, 1, "starting (fps=%d base_speed=%.0f base_scroll=%.1f internal_mods=0x%x bindings=%zu debug=%d)",
-	         fps, eng->base_speed, eng->base_scroll, eng->internal_mods, eng->num_bindings, debug_level);
+	const char *pname = keycode_name(eng->prefix_key);
+	logf_lvl(&b, 1, "starting (fps=%d prefix=%s(%u) base_speed=%.0f base_scroll=%.1f bindings=%zu debug=%d)",
+	         fps, pname ? pname : "unknown", eng->prefix_key,
+	         eng->base_speed, eng->base_scroll, eng->num_bindings, debug_level);
 
 	b.uinput_kbd_fd = create_virtual_keyboard();
 	if (b.uinput_kbd_fd < 0) {

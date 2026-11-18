@@ -162,34 +162,21 @@ static void
 test_binding_validation(void)
 {
 	char err[128] = {0};
-	assert(engine_validate_bindings(bindings, ARRAY_LEN(bindings), err, sizeof(err)));
+	assert(engine_validate_bindings(PREFIX_KEY, bindings, ARRAY_LEN(bindings), err, sizeof(err)));
 
-	Binding dup_global[] = {
-		{MOD_NONE, KEY_CAPSLOCK, BIND_GLOBAL | BIND_ANY_MOD, cmd_activate, {0}, cmd_deactivate, {0}},
-		{MOD_SUPER, KEY_CAPSLOCK, BIND_GLOBAL | BIND_ANY_MOD, cmd_toggle_active, {0}, NULL, {0}},
+	Binding dup[] = {
+		{KEY_W, cmd_move_start, {.u = DIR_UP}, cmd_move_stop, {.u = DIR_UP}},
+		{KEY_W, cmd_move_start, {.u = DIR_DOWN}, NULL, {0}},
 	};
-	assert(!engine_validate_bindings(dup_global, ARRAY_LEN(dup_global), err, sizeof(err)));
+	assert(!engine_validate_bindings(PREFIX_KEY, dup, ARRAY_LEN(dup), err, sizeof(err)));
 
-	Binding exact_plus_fallback[] = {
-		{MOD_NONE, KEY_CAPSLOCK, BIND_GLOBAL | BIND_ANY_MOD, cmd_activate, {0}, cmd_deactivate, {0}},
-		{MOD_SHIFT, KEY_CAPSLOCK, BIND_GLOBAL | BIND_NOREPEAT, cmd_activate_scroll, {0}, NULL, {0}},
+	Binding prefix_in_table[] = {
+		{KEY_CAPSLOCK, cmd_quit, {0}, NULL, {0}},
 	};
-	assert(engine_validate_bindings(exact_plus_fallback, ARRAY_LEN(exact_plus_fallback), err, sizeof(err)));
+	assert(!engine_validate_bindings(KEY_CAPSLOCK, prefix_in_table, ARRAY_LEN(prefix_in_table),
+	                                 err, sizeof(err)));
 
-	Binding anymod_no_global[] = {
-		{MOD_NONE, KEY_W, BIND_ANY_MOD, cmd_move_start, {.u = DIR_UP}, NULL, {0}},
-	};
-	assert(!engine_validate_bindings(anymod_no_global, ARRAY_LEN(anymod_no_global), err, sizeof(err)));
-
-	Binding mod_no_global[] = {
-		{MOD_SHIFT, KEY_W, BIND_NONE, cmd_move_start, {.u = DIR_UP}, NULL, {0}},
-	};
-	assert(!engine_validate_bindings(mod_no_global, ARRAY_LEN(mod_no_global), err, sizeof(err)));
-
-	Binding mod_with_release[] = {
-		{MOD_SHIFT, KEY_W, BIND_GLOBAL, cmd_activate, {0}, cmd_deactivate, {0}},
-	};
-	assert(!engine_validate_bindings(mod_with_release, ARRAY_LEN(mod_with_release), err, sizeof(err)));
+	assert(!engine_validate_bindings(KEY_CNT + 1, bindings, ARRAY_LEN(bindings), err, sizeof(err)));
 }
 
 static void
@@ -197,7 +184,7 @@ test_normal_mode_and_wm_keys_untouched(void)
 {
 	EventLog log;
 	Engine eng;
-	engine_init(&eng, bindings, ARRAY_LEN(bindings), internal_mods,
+	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
 	eng.debug_level = 2;
 
@@ -230,7 +217,7 @@ test_mod_plus_mouse_both_orders(void)
 {
 	EventLog log;
 	Engine eng;
-	engine_init(&eng, bindings, ARRAY_LEN(bindings), internal_mods,
+	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
 	eng.debug_level = 2;
 
@@ -285,52 +272,42 @@ test_mod_plus_mouse_both_orders(void)
 }
 
 static void
-test_passthrough_vs_internal_mods(void)
+test_passthrough_vs_bound_mods(void)
 {
 	EventLog log;
 	Engine eng;
-	engine_init(&eng, bindings, ARRAY_LEN(bindings), internal_mods,
+	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
 	eng.debug_level = 2;
 
 	engine_process_key(&eng, KEY_CAPSLOCK, 1);
 	assert(eng.active);
 
-	// RightCtrl is NOT bound in bindings[] -> passes through for Ctrl+Click / Ctrl+Scroll!
+	// Unbound modifiers pass through for Mod+Click / Mod+Scroll!
 	engine_process_key(&eng, KEY_RIGHTCTRL, 1);
-	assert(eng.virt_down[KEY_RIGHTCTRL] == 1);
-	engine_process_key(&eng, KEY_SPACE, 1);
-	assert(eng.btn_down[0] == 1);
-	engine_process_key(&eng, KEY_SPACE, 0);
-	engine_process_key(&eng, KEY_RIGHTCTRL, 0);
-	assert(eng.virt_down[KEY_RIGHTCTRL] == 0);
-
-	// LeftShift, RightShift, and RightAlt pass through (Tab is scroll, so Shift+Click works!)
 	engine_process_key(&eng, KEY_LEFTSHIFT, 1);
 	engine_process_key(&eng, KEY_RIGHTSHIFT, 1);
 	engine_process_key(&eng, KEY_RIGHTALT, 1);
+	assert(eng.virt_down[KEY_RIGHTCTRL] == 1);
 	assert(eng.virt_down[KEY_LEFTSHIFT] == 1);
 	assert(eng.virt_down[KEY_RIGHTSHIFT] == 1);
 	assert(eng.virt_down[KEY_RIGHTALT] == 1);
-	engine_process_key(&eng, KEY_LEFTSHIFT, 0);
-	engine_process_key(&eng, KEY_RIGHTSHIFT, 0);
+	engine_process_key(&eng, KEY_SPACE, 1);
+	assert(eng.btn_down[0] == 1);
+	engine_process_key(&eng, KEY_SPACE, 0);
 	engine_process_key(&eng, KEY_RIGHTALT, 0);
+	engine_process_key(&eng, KEY_RIGHTSHIFT, 0);
+	engine_process_key(&eng, KEY_LEFTSHIFT, 0);
+	engine_process_key(&eng, KEY_RIGHTCTRL, 0);
+	assert(eng.virt_down[KEY_RIGHTCTRL] == 0);
 
-	// Tab switches movement to scroll and is NOT forwarded
-	engine_process_key(&eng, KEY_TAB, 1);
-	assert(eng.virt_down[KEY_TAB] == 0);
-	assert(eng.move_is_scroll);
-	engine_process_key(&eng, KEY_TAB, 0);
-	assert(!eng.move_is_scroll);
-
-	// LeftCtrl IS bound (multiply 32x) and MOD_CTRL is in internal_mods -> NOT forwarded
+	// Bound modifiers (LeftCtrl, LeftAlt) are consumed and scale speed
 	engine_process_key(&eng, KEY_LEFTCTRL, 1);
 	assert(eng.virt_down[KEY_LEFTCTRL] == 0);
 	assert(fabs(eng.ptr.mul - 32.0) < 1e-9);
 	engine_process_key(&eng, KEY_LEFTCTRL, 0);
 	assert(fabs(eng.ptr.mul - 1.0) < 1e-9);
 
-	// LeftAlt IS bound (divide 8x) and MOD_ALT is in internal_mods -> NOT forwarded
 	engine_process_key(&eng, KEY_LEFTALT, 1);
 	assert(eng.virt_down[KEY_LEFTALT] == 0);
 	assert(fabs(eng.ptr.mul - 0.125) < 1e-9);
@@ -340,18 +317,16 @@ test_passthrough_vs_internal_mods(void)
 	engine_process_key(&eng, KEY_CAPSLOCK, 0);
 	assert(!eng.active);
 
-	// If MOD_CTRL is NOT in internal_mods, LeftCtrl both scales speed and passes through
-	Engine eng_pass;
-	engine_init(&eng_pass, bindings, ARRAY_LEN(bindings), MOD_SHIFT | MOD_ALT,
-	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
-	engine_process_key(&eng_pass, KEY_CAPSLOCK, 1);
-	engine_process_key(&eng_pass, KEY_LEFTCTRL, 1);
-	assert(eng_pass.virt_down[KEY_LEFTCTRL] == 1);
-	assert(fabs(eng_pass.ptr.mul - 32.0) < 1e-9);
-	engine_process_key(&eng_pass, KEY_LEFTCTRL, 0);
-	assert(eng_pass.virt_down[KEY_LEFTCTRL] == 0);
-	assert(fabs(eng_pass.ptr.mul - 1.0) < 1e-9);
-	engine_process_key(&eng_pass, KEY_CAPSLOCK, 0);
+	// Pre-held bound modifier (LeftCtrl before CapsLock) is released & suppressed until release
+	engine_process_key(&eng, KEY_LEFTCTRL, 1);
+	assert(eng.virt_down[KEY_LEFTCTRL] == 1);
+	engine_process_key(&eng, KEY_CAPSLOCK, 1);
+	assert(eng.virt_down[KEY_LEFTCTRL] == 0);
+	assert(eng.suppress_until_release[KEY_LEFTCTRL] == 1);
+	engine_process_key(&eng, KEY_LEFTCTRL, 0);
+	assert(eng.suppress_until_release[KEY_LEFTCTRL] == 0);
+	assert(fabs(eng.ptr.mul - 1.0) < 1e-9);
+	engine_process_key(&eng, KEY_CAPSLOCK, 0);
 }
 
 static void
@@ -359,14 +334,14 @@ test_scroll_and_multipliers_under_capslock(void)
 {
 	EventLog log;
 	Engine eng;
-	engine_init(&eng, bindings, ARRAY_LEN(bindings), internal_mods,
+	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
 	eng.debug_level = 2;
 
-	// Hold CapsLock, toggle scroll via F, scroll diagonally S + A
+	// Hold CapsLock, hold Tab for scroll mode, scroll diagonally S + A
 	engine_process_key(&eng, KEY_CAPSLOCK, 1);
-	engine_process_key(&eng, KEY_F, 1);
-	engine_process_key(&eng, KEY_F, 0);
+	engine_process_key(&eng, KEY_TAB, 1);
+	assert(eng.virt_down[KEY_TAB] == 0);
 	assert(eng.move_is_scroll);
 
 	log.count = 0;
@@ -377,39 +352,38 @@ test_scroll_and_multipliers_under_capslock(void)
 	assert(log.events[0].val1 == -1 && log.events[0].val2 == -1);
 	assert(log.events[0].val3 == -HIRES_PER_NOTCH && log.events[0].val4 == -HIRES_PER_NOTCH);
 
+	engine_process_key(&eng, KEY_A, 0);
+	engine_process_key(&eng, KEY_S, 0);
+	engine_process_key(&eng, KEY_TAB, 0);
+	assert(!eng.move_is_scroll);
+
 	// Speed multipliers J (/8), K (/2), L (*4), ; (*8)
 	engine_process_key(&eng, KEY_L, 1);
 	assert(fabs(eng.ptr.mul - 4.0) < 1e-9);
 	engine_process_key(&eng, KEY_J, 1);
 	assert(fabs(eng.ptr.mul - 0.5) < 1e-9);
+	engine_process_key(&eng, KEY_SEMICOLON, 1);
+	assert(fabs(eng.ptr.mul - 4.0) < 1e-9);
+	engine_process_key(&eng, KEY_K, 1);
+	assert(fabs(eng.ptr.mul - 2.0) < 1e-9);
 
-	// Releasing CapsLock resets scroll toggle, speed multiplier, and movement
+	// Releasing CapsLock resets speed multiplier and movement
 	engine_process_key(&eng, KEY_CAPSLOCK, 0);
 	assert(!eng.active);
 	assert(!eng.move_is_scroll);
 	assert(fabs(eng.ptr.mul - 1.0) < 1e-9);
 	assert(!engine_is_moving(&eng));
 
-	// Shift + CapsLock enters sticky scroll mode, releases LeftShift, and `q` exits
-	engine_process_key(&eng, KEY_LEFTSHIFT, 1);
-	assert(eng.virt_down[KEY_LEFTSHIFT] == 1);
+	// CapsLock + X quits cleanly while releasing held buttons
 	engine_process_key(&eng, KEY_CAPSLOCK, 1);
-	assert(eng.active && eng.move_is_scroll);
-	assert(eng.virt_down[KEY_LEFTSHIFT] == 0);
-	engine_process_key(&eng, KEY_CAPSLOCK, 0);
-	engine_process_key(&eng, KEY_LEFTSHIFT, 0);
-	assert(eng.active && eng.move_is_scroll);
-
-	// Pressing CapsLock again while in sticky scroll mode must not leak KEY_CAPSLOCK
-	log.count = 0;
-	engine_process_key(&eng, KEY_CAPSLOCK, 1);
+	engine_process_key(&eng, KEY_SPACE, 1);
+	assert(eng.btn_down[0] == 1);
+	engine_process_key(&eng, KEY_X, 1);
+	assert(eng.quitting && !eng.active && eng.btn_down[0] == 0);
+	engine_process_key(&eng, KEY_X, 0);
+	engine_process_key(&eng, KEY_SPACE, 0);
 	engine_process_key(&eng, KEY_CAPSLOCK, 0);
 	assert(eng.virt_down[KEY_CAPSLOCK] == 0);
-	assert(count_events(&log, 1, KEY_CAPSLOCK, 1) == 0);
-
-	engine_process_key(&eng, KEY_Q, 1);
-	engine_process_key(&eng, KEY_Q, 0);
-	assert(!eng.active && !eng.move_is_scroll);
 }
 
 static void
@@ -417,7 +391,7 @@ test_autorepeat_and_midkey_activation(void)
 {
 	EventLog log;
 	Engine eng;
-	engine_init(&eng, bindings, ARRAY_LEN(bindings), internal_mods,
+	engine_init(&eng, PREFIX_KEY, bindings, ARRAY_LEN(bindings),
 	            BASE_SPEED, BASE_SCROLL, make_test_ops(&log));
 	eng.debug_level = 2;
 
@@ -465,7 +439,7 @@ main(void)
 	test_binding_validation();
 	test_normal_mode_and_wm_keys_untouched();
 	test_mod_plus_mouse_both_orders();
-	test_passthrough_vs_internal_mods();
+	test_passthrough_vs_bound_mods();
 	test_scroll_and_multipliers_under_capslock();
 	test_autorepeat_and_midkey_activation();
 	printf("uptrkeys_test: all 8 tests passed\n");

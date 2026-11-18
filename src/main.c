@@ -82,7 +82,7 @@ main(int argc, char *argv[])
 
 	size_t num_bindings = sizeof(bindings) / sizeof(bindings[0]);
 	char errbuf[256] = {0};
-	if (!engine_validate_bindings(bindings, num_bindings, errbuf, sizeof(errbuf))) {
+	if (!engine_validate_bindings(PREFIX_KEY, bindings, num_bindings, errbuf, sizeof(errbuf))) {
 		fprintf(stderr, "uptrkeys: invalid config: %s\n", errbuf);
 		return 1;
 	}
@@ -92,7 +92,7 @@ main(int argc, char *argv[])
 
 	Engine eng;
 	EngineOps empty_ops = {0};
-	engine_init(&eng, bindings, num_bindings, internal_mods,
+	engine_init(&eng, PREFIX_KEY, bindings, num_bindings,
 	            BASE_SPEED, BASE_SCROLL, empty_ops);
 
 	return backend_run(&eng, FPS, &stop_requested, &wait_mask);
