@@ -94,7 +94,9 @@ fi
 
 # 2. Verify all absolute filesystem paths compiled into the binary are /dev/input* or /dev/uinput
 #    (plus the ELF dynamic linker /lib*/ld-linux* or /lib*/ld-musl*).
-BAD_PATHS=$(strings -n 4 "$BIN" | grep '^/' | grep -Ev '^(/dev/uinput$|/dev/input(/uinput|/%s)?$|/+lib(64)?/ld-(linux|musl))' || true)
+#    Use `-d` so raw section-adjacent bytes (e.g. .note.ABI-tag) don't bleed into .interp.
+RAW_STRINGS=$(strings -n 4 -d "$BIN" 2>/dev/null || strings -n 4 "$BIN")
+BAD_PATHS=$(printf '%s\n' "$RAW_STRINGS" | grep '^/' | grep -Ev '^(/dev/uinput$|/dev/input(/uinput|/%s)?$|/+lib(64)?/ld-(linux|musl))' || true)
 if [ -n "$BAD_PATHS" ]; then
 	echo "audit FAIL: unexpected path string(s): $BAD_PATHS" >&2
 	exit 1
